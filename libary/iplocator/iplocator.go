@@ -1,10 +1,11 @@
 package iplocator
 
 import (
-	"github/longpi1/gopkg/libary/log"
 	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/longpi1/gopkg/libary/log"
 
 	"github.com/lionsoul2014/ip2region/binding/golang/xdb"
 	"github.com/mlogclub/simple/common/strs"

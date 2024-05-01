@@ -2,11 +2,12 @@ package queue
 
 import (
 	"fmt"
-	"github/longpi1/gopkg/libary/constant"
 	"math/rand"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/longpi1/gopkg/libary/constant"
 )
 
 type Queue interface {

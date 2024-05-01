@@ -1,4 +1,4 @@
-module github/longpi1/gopkg
+module github.com/longpi1/gopkg
 
 go 1.22.2
 
