@@ -37,7 +37,6 @@ type Config struct {
 	Driver    string `json:"driver"`
 	Retry     int    `json:"retry"`
 	GroupName string `json:"groupName"`
-	Redis     RedisConf
 	Rocket    RocketConf
 	Kafka     KafkaConf
 	Pulsar    PulsarConf
@@ -78,50 +77,49 @@ type Msg struct {
 }
 
 var (
-	mutex  sync.Mutex
-	config Config
+	mutex sync.Mutex
 )
 
 // InstanceConsumer 实例化消费者
-func InstanceConsumer() (mqClient Consumer, err error) {
-	return NewConsumer(config.GroupName)
+func InstanceConsumer(cfg Config) (mqClient Consumer, err error) {
+	return NewConsumer(cfg)
 }
 
 // InstanceProducer 实例化生产者
-func InstanceProducer() (client Producer, err error) {
-	return NewProducer(config.GroupName)
+func InstanceProducer(cfg Config) (client Producer, err error) {
+	return NewProducer(cfg)
 }
 
 // NewProducer 初始化生产者实例
-func NewProducer(groupName string) (client Producer, err error) {
-	if groupName == "" {
+func NewProducer(cfg Config) (client Producer, err error) {
+	if cfg.GroupName == "" {
 		err = fmt.Errorf("mq groupName is empty")
 		return
 	}
 
-	switch config.Driver {
+	switch cfg.Driver {
 	case constant.RocketMqName:
-		if len(config.Rocket.Address) == 0 {
+		if len(cfg.Rocket.Address) == 0 {
 			err = fmt.Errorf("queue rocketmq address is not support")
 			return
 		}
-		client, err = RegisterRocketProducer(config.Rocket.Address, groupName, config.Retry)
+		client, err = RegisterRocketProducer(cfg.Rocket.Address, cfg.GroupName, cfg.Retry)
 	case constant.KafkaMqName:
-		if len(config.Kafka.Address) == 0 {
+		if len(cfg.Kafka.Address) == 0 {
 			err = fmt.Errorf("queue kafka address is not support")
 			return
 		}
 		client, err = RegisterKafkaProducer(KafkaConfig{
-			Brokers: config.Kafka.Address,
-			GroupID: groupName,
-			Version: config.Kafka.Version,
+			Brokers: cfg.Kafka.Address,
+			GroupID: cfg.GroupName,
+			Version: cfg.Kafka.Version,
 		})
 	case constant.PulsarMqName:
-		if len(config.Pulsar.Address) == 0 {
+		if len(cfg.Pulsar.Address) == 0 {
 			err = fmt.Errorf("queue pulsar address is not support")
 			return
 		}
-		client, err = RegisterPulsarProducer(config.Pulsar)
+		client, err = RegisterPulsarProducer(cfg.Pulsar)
 	default:
 		err = fmt.Errorf("queue driver is not support")
 	}
@@ -137,48 +135,48 @@ func NewProducer(groupName string) (client Producer, err error) {
 }
 
 // NewConsumer 初始化消费者实例
-func NewConsumer(groupName string) (client Consumer, err error) {
-	if groupName == "" {
+func NewConsumer(cfg Config) (client Consumer, err error) {
+	if cfg.GroupName == "" {
 		err = fmt.Errorf("mq groupName is empty")
 		return
 	}
 
-	switch config.Driver {
+	switch cfg.Driver {
 	case constant.RocketMqName:
-		if len(config.Rocket.Address) == 0 {
+		if len(cfg.Rocket.Address) == 0 {
 			err = fmt.Errorf("queue.rocketmq.address is empty")
 			return
 		}
-		client, err = RegisterRocketConsumer(config.Rocket.Address, groupName)
+		client, err = RegisterRocketConsumer(cfg.Rocket.Address, cfg.GroupName)
 	case constant.KafkaMqName:
-		if len(config.Kafka.Address) == 0 {
+		if len(cfg.Kafka.Address) == 0 {
 			err = fmt.Errorf("queue kafka address is not support")
 			return
 		}
 
 		randTag := strconv.FormatInt(time.Now().Unix(), 10)
 		// 是否支持创建多个消费者
-		if !config.Kafka.MultiConsumer {
+		if !cfg.Kafka.MultiConsumer {
 			randTag = "001"
 		}
 
-		clientId := "HOTGO-Consumer-" + groupName
-		if config.Kafka.RandClient {
+		clientId := "Consumer-" + cfg.GroupName
+		if cfg.Kafka.RandClient {
 			clientId += "-" + randTag
 		}
 
 		client, err = RegisterKafkaConsumer(KafkaConfig{
-			Brokers:  config.Kafka.Address,
-			GroupID:  groupName,
-			Version:  config.Kafka.Version,
+			Brokers:  cfg.Kafka.Address,
+			GroupID:  cfg.GroupName,
+			Version:  cfg.Kafka.Version,
 			ClientId: clientId,
 		})
 	case constant.PulsarMqName:
-		if len(config.Pulsar.Address) == 0 {
+		if len(cfg.Pulsar.Address) == 0 {
 			err = fmt.Errorf("queue pulsar address is not support")
 			return
 		}
-		client, err = RegisterPulsarConsumer(config.Pulsar)
+		client, err = RegisterPulsarConsumer(cfg.Pulsar)
 	default:
 		err = fmt.Errorf("queue driver is not support")
 	}

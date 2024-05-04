@@ -36,19 +36,19 @@ func RegisterConsumer(cs ConsumerInterface) {
 }
 
 // StartConsumersListener 启动所有已注册的消费者监听
-func StartConsumersListener(ctx context.Context) {
+func StartConsumersListener(ctx context.Context, cfg Config) {
 	for _, c := range consumers.list {
 		go func(c ConsumerInterface) {
-			consumerListen(ctx, c)
+			consumerListen(ctx, c, cfg)
 		}(c)
 	}
 }
 
 // consumerListen 消费者监听
-func consumerListen(ctx context.Context, consumer ConsumerInterface) {
+func consumerListen(ctx context.Context, consumer ConsumerInterface, cfg Config) {
 	var (
 		topic  = consumer.GetTopic()
-		c, err = InstanceConsumer()
+		c, err = InstanceConsumer(cfg)
 	)
 
 	if err != nil {

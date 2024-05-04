@@ -11,8 +11,8 @@ import (
 )
 
 // Push 推送队列
-func Push(topic string, data interface{}) (err error) {
-	q, err := InstanceProducer()
+func Push(topic string, data interface{}, cfg Config) (err error) {
+	q, err := InstanceProducer(cfg)
 	if err != nil {
 		return
 	}
@@ -24,8 +24,8 @@ func Push(topic string, data interface{}) (err error) {
 }
 
 // DelayPush 推送延迟队列
-func DelayPush(topic string, data interface{}, second int64) (err error) {
-	q, err := InstanceProducer()
+func DelayPush(topic string, data interface{}, second int64, cfg Config) (err error) {
+	q, err := InstanceProducer(cfg)
 	if err != nil {
 		return
 	}
