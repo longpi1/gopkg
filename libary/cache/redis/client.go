@@ -39,8 +39,10 @@ type Cache interface {
 	IncrBy(ctx context.Context, key string, val int64) error
 	Delete(ctx context.Context, key string) error
 	GetMutex(mutexname string) *redsync.Mutex
-	ExecPipeLine(ctx context.Context, cmds *[]RedisCmd) error
+	ExecPipeLine(ctx context.Context, cmds *[]Cmd) error
 	Publish(ctx context.Context, topic string, payload interface{}) error
+	TopKAdd(ctx context.Context, topic string, payload interface{}) error
+	TopKQuery(ctx context.Context, topic string, payload interface{}) ([]bool, error)
 }
 
 // CacheImpl is the redis cache client type
@@ -67,50 +69,51 @@ type RedisPayload interface {
 	Payload()
 }
 
-// RedisSetPayload is the payload type of set method
-type RedisSetPayload struct {
+// SetPayload is the payload type of set method
+type SetPayload struct {
 	RedisPayload
 	Key string
 	Val interface{}
 }
 
-// RedisDeletePayload is the payload type of delete method
-type RedisDeletePayload struct {
+// DeletePayload is the payload type of delete method
+type DeletePayload struct {
 	RedisPayload
 	Key string
 }
 
-// RedisIncrByXPayload is the payload type of incrByX method
-type RedisIncrByXPayload struct {
+// IncrByXPayload is the payload type of incrByX method
+type IncrByXPayload struct {
 	RedisPayload
 	Key string
 	Val int64
 }
 
 // Payload implements abstract interface
-func (RedisSetPayload) Payload() {}
+func (SetPayload) Payload() {}
 
 // Payload implements abstract interface
-func (RedisDeletePayload) Payload() {}
+func (DeletePayload) Payload() {}
 
 // Payload implements abstract interface
-func (RedisIncrByXPayload) Payload() {}
+func (IncrByXPayload) Payload() {}
 
-// RedisCmd represents an operation and its payload
-type RedisCmd struct {
+// Cmd represents an operation and its payload
+type Cmd struct {
 	OpType  OpType
 	Payload RedisPayload
 }
 
-// RedisPipelineCmd is redis pipeline command type
-type RedisPipelineCmd struct {
+// PipelineCmd is redis pipeline command type
+type PipelineCmd struct {
 	OpType OpType
 	Cmd    interface{}
 }
 
+// NewRedisClient 创建一个新的 Redis 客户端
 func NewRedisClient(config *conf.RedisConfig) (redis.UniversalClient, error) {
-	Client = redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs:         getServerAddrs(config.Address),
+	client := redis.NewClusterClient(&redis.ClusterOptions{
+		Addrs:         getServerAdders(config.Address),
 		Password:      config.Password,
 		PoolSize:      config.PoolSize,
 		MaxRetries:    config.MaxRetries,
@@ -118,12 +121,12 @@ func NewRedisClient(config *conf.RedisConfig) (redis.UniversalClient, error) {
 		RouteRandomly: true,
 	})
 	ctx := context.Background()
-	_, err := Client.Ping(ctx).Result()
-	if err == redis.Nil || err != nil {
+	_, err := client.Ping(ctx).Result()
+	if err != nil {
 		return nil, err
 	}
-	redisotel.InstrumentTracing(Client)
-	return Client, nil
+	_ = redisotel.InstrumentTracing(client)
+	return client, nil
 }
 
 // NewRedisCache is the factory of redis cache
@@ -141,7 +144,7 @@ func NewRedisCache(config *conf.RedisConfig, client redis.UniversalClient) Cache
 // Get returns true if the key already exists and set dst to the corresponding value
 func (rc *CacheImpl) Get(ctx context.Context, key string, dst interface{}) (bool, error) {
 	val, err := rc.client.Get(ctx, key).Result()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -157,7 +160,7 @@ func (rc *CacheImpl) Exist(ctx context.Context, key string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	exist := (numExistKey == 1)
+	exist := numExistKey == 1
 	return exist, nil
 }
 
@@ -201,7 +204,7 @@ func (rc *CacheImpl) BFExist(ctx context.Context, key string, item interface{}) 
 	if err != nil {
 		return false, err
 	}
-	return (res == 1), nil
+	return res == 1, nil
 }
 
 func (rc *CacheImpl) CFReserve(ctx context.Context, key string, capacity int64, bucketSize, maxIterations int) error {
@@ -223,7 +226,7 @@ func (rc *CacheImpl) CFExist(ctx context.Context, key string, item interface{}) 
 	if err != nil {
 		return false, err
 	}
-	return (res == 1), nil
+	return res == 1, nil
 }
 
 func (rc *CacheImpl) CFDel(ctx context.Context, key string, item interface{}) error {
@@ -257,28 +260,28 @@ end
 `)
 
 // ExecPipeLine execute the given commands in a pipline
-func (rc *CacheImpl) ExecPipeLine(ctx context.Context, cmds *[]RedisCmd) error {
+func (rc *CacheImpl) ExecPipeLine(ctx context.Context, cmds *[]Cmd) error {
 	pipe := rc.client.Pipeline()
-	var pipelineCmds []RedisPipelineCmd
+	var pipelineCmds []PipelineCmd
 	for _, cmd := range *cmds {
 		switch cmd.OpType {
 		case SET:
-			strVal, err := json.Marshal(cmd.Payload.(RedisSetPayload).Val)
+			strVal, err := json.Marshal(cmd.Payload.(SetPayload).Val)
 			if err != nil {
 				return err
 			}
-			pipelineCmds = append(pipelineCmds, RedisPipelineCmd{
+			pipelineCmds = append(pipelineCmds, PipelineCmd{
 				OpType: SET,
-				Cmd:    pipe.Set(ctx, cmd.Payload.(RedisSetPayload).Key, strVal, getRandomExpiration(rc.expiration)),
+				Cmd:    pipe.Set(ctx, cmd.Payload.(SetPayload).Key, strVal, getRandomExpiration(rc.expiration)),
 			})
 		case DELETE:
-			pipelineCmds = append(pipelineCmds, RedisPipelineCmd{
+			pipelineCmds = append(pipelineCmds, PipelineCmd{
 				OpType: DELETE,
-				Cmd:    pipe.Del(ctx, cmd.Payload.(RedisDeletePayload).Key),
+				Cmd:    pipe.Del(ctx, cmd.Payload.(DeletePayload).Key),
 			})
 		case INCRBYX:
-			payload := cmd.Payload.(RedisIncrByXPayload)
-			pipelineCmds = append(pipelineCmds, RedisPipelineCmd{
+			payload := cmd.Payload.(IncrByXPayload)
+			pipelineCmds = append(pipelineCmds, PipelineCmd{
 				OpType: INCRBYX,
 				Cmd:    incrByX.Run(ctx, pipe, []string{payload.Key}, payload.Val),
 			})
@@ -318,10 +321,26 @@ func (rc *CacheImpl) Publish(ctx context.Context, topic string, payload interfac
 	return rc.client.Publish(ctx, topic, strVal).Err()
 }
 
+func (rc *CacheImpl) TopKAdd(ctx context.Context, topic string, payload interface{}) error {
+	strVal, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return rc.client.TopKAdd(ctx, topic, strVal).Err()
+}
+
+func (rc *CacheImpl) TopKQuery(ctx context.Context, topic string, payload interface{}) ([]bool, error) {
+	strVal, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	return rc.client.TopKQuery(ctx, topic, strVal).Result()
+}
+
 func getRandomExpiration(expiration int) time.Duration {
 	return time.Duration(int64(expiration)+rand.Int63n(10)) * time.Second
 }
 
-func getServerAddrs(addrs string) []string {
-	return strings.Split(addrs, ",")
+func getServerAdders(adders string) []string {
+	return strings.Split(adders, ",")
 }
