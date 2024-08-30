@@ -6,15 +6,15 @@ import (
 	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
 
-type RedisBloomFilter struct {
+type BloomFilter struct {
 	client *redis.Client
 	filter *cuckoo.Filter
 	key    string
 }
 
-func NewRedisBloomFilter(client *redis.Client, key string, size uint, hashes int) (*RedisBloomFilter, error) {
+func NewRedisBloomFilter(client *redis.Client, key string, size uint, hashes int) (*BloomFilter, error) {
 	bf := cuckoo.NewFilter(size)
-	rb := &RedisBloomFilter{
+	rb := &BloomFilter{
 		client: client,
 		filter: bf,
 		key:    key,
@@ -28,7 +28,7 @@ func NewRedisBloomFilter(client *redis.Client, key string, size uint, hashes int
 	return rb, nil
 }
 
-func (rb *RedisBloomFilter) load() error {
+func (rb *BloomFilter) load() error {
 	data, err := rb.client.HGetAll(rb.key).Result()
 	if err != nil {
 		return err

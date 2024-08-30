@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/longpi1/gopkg/libary/conf"
+	"github.com/longpi1/gopkg/libary/utils"
 	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
@@ -110,23 +109,26 @@ type PipelineCmd struct {
 	Cmd    interface{}
 }
 
-// NewRedisClient 创建一个新的 Redis 客户端
-func NewRedisClient(config *conf.RedisConfig) (redis.UniversalClient, error) {
-	client := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs:         getServerAdders(config.Address),
-		Password:      config.Password,
-		PoolSize:      config.PoolSize,
-		MaxRetries:    config.MaxRetries,
-		ReadOnly:      true,
-		RouteRandomly: true,
-	})
-	ctx := context.Background()
-	_, err := client.Ping(ctx).Result()
-	if err != nil {
-		return nil, err
+// GetRedisClient 获取一个 Redis 客户端
+func GetRedisClient(config *conf.RedisConfig) (redis.UniversalClient, error) {
+	if Client == nil {
+		Client = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:         utils.GetServerAdders(config.Address),
+			Password:      config.Password,
+			PoolSize:      config.PoolSize,
+			MaxRetries:    config.MaxRetries,
+			ReadOnly:      true,
+			RouteRandomly: true,
+		})
+		ctx := context.Background()
+		_, err := Client.Ping(ctx).Result()
+		if err != nil {
+			return nil, err
+		}
+		_ = redisotel.InstrumentTracing(Client)
 	}
-	_ = redisotel.InstrumentTracing(client)
-	return client, nil
+
+	return Client, nil
 }
 
 // NewRedisCache is the factory of redis cache
@@ -170,7 +172,7 @@ func (rc *CacheImpl) Set(ctx context.Context, key string, val interface{}) error
 	if err != nil {
 		return err
 	}
-	if err := rc.client.Set(ctx, key, strVal, getRandomExpiration(rc.expiration)).Err(); err != nil {
+	if err := rc.client.Set(ctx, key, strVal, utils.GetRandomExpiration(rc.expiration)).Err(); err != nil {
 		return err
 	}
 	return nil
@@ -272,7 +274,7 @@ func (rc *CacheImpl) ExecPipeLine(ctx context.Context, cmds *[]Cmd) error {
 			}
 			pipelineCmds = append(pipelineCmds, PipelineCmd{
 				OpType: SET,
-				Cmd:    pipe.Set(ctx, cmd.Payload.(SetPayload).Key, strVal, getRandomExpiration(rc.expiration)),
+				Cmd:    pipe.Set(ctx, cmd.Payload.(SetPayload).Key, strVal, utils.GetRandomExpiration(rc.expiration)),
 			})
 		case DELETE:
 			pipelineCmds = append(pipelineCmds, PipelineCmd{
@@ -335,12 +337,4 @@ func (rc *CacheImpl) TopKQuery(ctx context.Context, topic string, payload interf
 		return nil, err
 	}
 	return rc.client.TopKQuery(ctx, topic, strVal).Result()
-}
-
-func getRandomExpiration(expiration int) time.Duration {
-	return time.Duration(int64(expiration)+rand.Int63n(10)) * time.Second
-}
-
-func getServerAdders(adders string) []string {
-	return strings.Split(adders, ",")
 }
