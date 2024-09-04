@@ -38,7 +38,6 @@ func (m simpleMuxMap[T]) get(path string) (val T, exist bool) {
 	return
 }
 
-// match assume pattern like `/core.v1.AuthenticateService/login`
 func (m simpleMuxMap[T]) match(pattern string) (val T, exist bool) {
 	idx := strings.IndexByte(pattern[1:], '/')
 	if idx < 0 {
