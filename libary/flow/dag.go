@@ -52,8 +52,11 @@ type Dag struct {
 	nodeIndex int // NodeIndex
 }
 
-func (dag *Dag) InitDags(filePath string) (*Dag, error) {
-
+func (dag *Dag) InitDag(filePath string) (*Dag, error) {
+	//flowConfig := conf.GetFlowConfig(filePath)
+	//for _, flow := range flowConfig.Flows {
+	//	flow.Name
+	//}
 	return dag, nil
 }
 

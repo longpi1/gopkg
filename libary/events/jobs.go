@@ -17,7 +17,7 @@ func (fn JobFn) Run() {
 	fn()
 }
 
-// Job job interface
+// Job interface
 type Job interface {
 	cron.Schedule
 	cron.Job
