@@ -1,12 +1,15 @@
 package conf
 
 import (
+	"sync"
+
 	"github.com/fsnotify/fsnotify"
 	"github.com/longpi1/gopkg/libary/log"
 	"github.com/spf13/viper"
 )
 
 var conf *Config
+var once sync.Once
 
 type FlowConfig struct {
 	Name       string
@@ -18,17 +21,17 @@ type Config struct {
 	Flows []FlowConfig
 }
 
-func GetFlowConfig(filePath string) *Config {
+func GetFlowConfig(name string, filePath string) *Config {
 	if conf == nil {
 		// 初始化flow配置信息
-		InitFlowConfig(filePath)
+		InitFlowConfig(name, filePath)
 	}
 	return conf
 }
 
-func InitFlowConfig(path string) {
+func InitFlowConfig(name string, path string) {
 	// 解析 config
-	viper.SetConfigName("mapping")
+	viper.SetConfigName(name)
 	viper.AddConfigPath(path)
 	viper.SetConfigType("yaml")
 	err := viper.ReadInConfig()

@@ -15,6 +15,7 @@ require (
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-redsync/redsync/v4 v4.13.0
 	github.com/gogf/gf/v2 v2.7.0
+	github.com/jinzhu/gorm v1.9.16
 	github.com/lionsoul2014/ip2region/binding/golang v0.0.0-20240419130813-d2b12ef0c81c
 	github.com/mlogclub/simple v1.2.25
 	github.com/onsi/ginkgo/v2 v2.1.3
