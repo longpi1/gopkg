@@ -48,5 +48,12 @@ func (flow *Flow) RunNode(ctx context.Context, node *Node) (err error) {
 }
 
 func (flow *Flow) RunNodeDone(ctx context.Context, node *Node, err error) {
-
+	// todo 一些后置操作，例如更新节点状态，释放资源等
+	// 可以在这里将子节点的入度 -1，当入度为0时，将其放入 readyChan
+	for _, child := range node.children {
+		child.indegree--
+		if child.indegree == 0 {
+			flow.readyChan <- child
+		}
+	}
 }
