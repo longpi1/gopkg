@@ -1,9 +1,8 @@
-# gctuner
+# gctuner（字节开源工具）
+## 介绍
 
-## Introduction
-
-Inspired
-by [How We Saved 70K Cores Across 30 Mission-Critical Services (Large-Scale, Semi-Automated Go GC Tuning @Uber)](https://eng.uber.com/how-we-saved-70k-cores-across-30-mission-critical-services/)
+启发
+通过uber的我们如何在30个关键任务服务中节省70K内核[How We Saved 70K Cores Across 30 Mission-Critical Services (Large-Scale, Semi-Automated Go GC Tuning @Uber)](https://eng.uber.com/how-we-saved-70k-cores-across-30-mission-critical-services/)
 .
 
 ```text
@@ -47,6 +46,8 @@ if threshold > 2*inuse, so gcPercent > 100, and GC negatively to reduce GC times
 ```
 
 ## Usage
+
+建议阈值为内存限制的70%。
 
 The recommended threshold is 70% of the memory limit.
 

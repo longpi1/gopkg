@@ -23,6 +23,20 @@ import (
 
 var testHeap []byte
 
+/*
+输出示例：
+
+	tuner_test.go:36: old gc percent before gc: 100
+	tuner_test.go:39: new gc percent after gc: 500
+	tuner_test.go:45: old gc percent before gc: 500
+	tuner_test.go:48: new gc percent after gc: 277
+	tuner_test.go:57: old gc percent before gc: 277
+	tuner_test.go:60: new gc percent after gc: 50
+	tuner_test.go:69: old gc percent before gc: 50
+	tuner_test.go:78: old gc percent before gc: 50
+	tuner_test.go:88: old gc percent before gc: 50
+	tuner_test.go:91: new gc percent after gc: 500
+*/
 func TestTuner(t *testing.T) {
 	is := assert.New(t)
 	memLimit := uint64(100 * 1024 * 1024) //100 MB
