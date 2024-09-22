@@ -12,36 +12,23 @@
 package hardware
 
 import (
-	"flag"
-	syslog "log"
 	"runtime"
 	"sync"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
-	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
 
-	"github.com/milvus-io/milvus/pkg/log"
-	"github.com/milvus-io/milvus/pkg/util/typeutil"
+	"github.com/longpi1/gopkg/libary/log"
 )
+
+const EmbeddedRole = "embedded"
 
 var (
 	icOnce sync.Once
 	ic     bool
 	icErr  error
 )
-
-// Initialize maxprocs
-func InitMaxprocs(serverType string, flags *flag.FlagSet) {
-	if serverType == typeutil.EmbeddedRole {
-		// Initialize maxprocs while discarding log.
-		maxprocs.Set(maxprocs.Logger(nil))
-	} else {
-		// Initialize maxprocs.
-		maxprocs.Set(maxprocs.Logger(syslog.Printf))
-	}
-}
 
 // GetCPUNum returns the count of cpu core.
 func GetCPUNum() int {
@@ -58,13 +45,13 @@ func GetCPUNum() int {
 func GetCPUUsage() float64 {
 	percents, err := cpu.Percent(0, false)
 	if err != nil {
-		log.Warn("failed to get cpu usage",
+		log.Error("failed to get cpu usage",
 			zap.Error(err))
 		return 0
 	}
 
 	if len(percents) != 1 {
-		log.Warn("something wrong in cpu.Percent, len(percents) must be equal to 1",
+		log.Error("something wrong in cpu.Percent, len(percents) must be equal to 1",
 			zap.Int("len(percents)", len(percents)))
 		return 0
 	}
@@ -77,7 +64,7 @@ func GetMemoryCount() uint64 {
 	// get host memory by `gopsutil`
 	stats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Warn("failed to get memory count",
+		log.Error("failed to get memory count",
 			zap.Error(err))
 		return 0
 	}
@@ -90,7 +77,7 @@ func GetMemoryCount() uint64 {
 	}
 
 	if err != nil || limit > stats.Total {
-		log.RatedWarn(3600, "failed to get container memory limit",
+		log.Error(3600, "failed to get container memory limit",
 			zap.Uint64("containerLimit", limit),
 			zap.Error(err))
 	}

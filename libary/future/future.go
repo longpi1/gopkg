@@ -18,103 +18,96 @@ package future
 
 import "go.uber.org/atomic"
 
+// future 接口定义了异步操作的结果类型所需的方法
 type future interface {
-	wait()
-	OK() bool
-	GetErr() error
+	wait()         // 等待异步操作完成
+	OK() bool      // 检查异步操作是否成功完成
+	GetErr() error // 获取异步操作的错误，如果有的话
 }
 
-// Future is a result type of async-await style.
-// It contains the result (or error) of an async task.
-// Trying to obtain the result (or error) blocks until the async task completes.
+// Future 是异步-等待风格的结果类型。
+// 它包含了一个异步任务的结果（或错误）。
+// 尝试获得结果（或错误）会阻塞，直到异步任务完成。
 type Future[T any] struct {
-	Ch    chan struct{}
-	Value T
-	Err   error
-	done  *atomic.Bool
+	Ch    chan struct{} // 用于通知任务完成的通道
+	Value T             // 异步操作的结果值
+	Err   error         // 异步操作的错误
+	done  *atomic.Bool  // 原子操作布尔值，用于标记任务是否完成
 }
 
 func NewFuture[T any]() *Future[T] {
 	return &Future[T]{
-		Ch:   make(chan struct{}),
-		done: atomic.NewBool(false),
+		Ch:   make(chan struct{}),   // 创建一个新的通道
+		done: atomic.NewBool(false), // 初始化任务未完成
 	}
 }
 
 func (future *Future[T]) wait() {
-	<-future.Ch
+	<-future.Ch // 阻塞，直到从通道接收到完成信号
 }
 
-// Return the result and error of the async task.
+// Await 等待异步任务完成并返回结果和错误。
 func (future *Future[T]) Await() (T, error) {
 	future.wait()
 	return future.Value, future.Err
 }
 
-// Return the result of the async task,
-// nil if no result or error occurred.
+// GetValue 返回异步任务的结果，如果没有结果或发生错误则返回nil。
 func (future *Future[T]) GetValue() T {
-	<-future.Ch
-
+	<-future.Ch // 等待任务完成
 	return future.Value
 }
 
-// Done indicates if the fn has finished.
+// Done 指示异步任务是否已经完成。
 func (future *Future[T]) Done() bool {
-	return future.done.Load()
+	return future.done.Load() // 使用原子操作读取完成状态
 }
 
-// False if error occurred,
-// true otherwise.
+// OK 如果没有发生错误返回true，否则返回false。
 func (future *Future[T]) OK() bool {
-	<-future.Ch
-
+	<-future.Ch // 等待任务完成
 	return future.Err == nil
 }
 
-// Return the error of the async task,
-// nil if no error.
+// GetErr 返回异步任务的错误，如果没有错误则返回nil。
 func (future *Future[T]) GetErr() error {
-	<-future.Ch
-
+	<-future.Ch // 等待任务完成
 	return future.Err
 }
 
-// Return a read-only channel,
-// which will be closed if the async task completes.
-// Use this if you need to wait the async task in a select statement.
+// Inner 返回一个只读通道，当异步任务完成时该通道会关闭。
+// 如果需要在select语句中等待异步任务，可以使用这个通道。
 func (future *Future[T]) Inner() <-chan struct{} {
 	return future.Ch
 }
 
-// Go spawns a goroutine to execute fn,
-// returns a future that contains the result of fn.
-// NOTE: use Pool if you need limited goroutines.
+// Go 启动一个goroutine来执行函数fn，
+// 返回一个包含fn结果的Future。
+// 注意：如果你需要限制goroutine数量，请使用Pool。
 func Go[T any](fn func() (T, error)) *Future[T] {
 	future := NewFuture[T]()
 	go func() {
-		future.Value, future.Err = fn()
-		close(future.Ch)
-		future.done.Store(true)
+		future.Value, future.Err = fn() // 执行函数并保存结果
+		close(future.Ch)                // 关闭通道，表示任务完成
+		future.done.Store(true)         // 标记任务已完成
 	}()
 	return future
 }
 
-// Await for multiple futures,
-// Return nil if no future returns error,
-// or return the first error in these futures.
+// AwaitAll 等待多个Future完成，
+// 如果没有Future返回错误则返回nil，
+// 否则返回这些Future中第一个错误。
 func AwaitAll[T future](futures ...T) error {
 	for i := range futures {
 		if !futures[i].OK() {
 			return futures[i].GetErr()
 		}
 	}
-
 	return nil
 }
 
-// BlockOnAll blocks until all futures complete.
-// Return the first error in these futures.
+// BlockOnAll 阻塞直到所有Future完成。
+// 返回这些Future中第一个错误。
 func BlockOnAll[T future](futures ...T) error {
 	var err error
 	for i := range futures {

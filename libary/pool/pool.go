@@ -19,6 +19,7 @@ package pool
 import (
 	"fmt"
 	"strconv"
+	_ "strconv"
 	"sync"
 
 	ants "github.com/panjf2000/ants/v2"
@@ -30,22 +31,23 @@ import (
 
 // A goroutine pool
 type Pool[T any] struct {
-	inner *ants.Pool
-	opt   *poolOption
+	inner *ants.Pool  // 使用ants包中的Pool来管理协程
+	opt   *poolOption // 池的配置选项
 }
 
-// NewPool returns a goroutine pool.
-// cap: the number of workers.
-// This panic if provide any invalid option.
+// NewPool 返回一个新的协程池。
+// cap: worker协程的数量。
+// 如果提供了任何无效的选项，该函数会panic。
 func NewPool[T any](cap int, opts ...PoolOption) *Pool[T] {
-	opt := defaultPoolOption()
+	opt := defaultPoolOption() // 获取默认的选项配置
 	for _, o := range opts {
-		o(opt)
+		o(opt) // 应用所有提供的选项
 	}
 
+	// 使用ants包创建一个新的协程池
 	pool, err := ants.NewPool(cap, opt.antsOptions()...)
 	if err != nil {
-		panic(err)
+		panic(err) // 如果创建失败，抛出panic
 	}
 
 	return &Pool[T]{
@@ -54,27 +56,26 @@ func NewPool[T any](cap int, opts ...PoolOption) *Pool[T] {
 	}
 }
 
-// NewDefaultPool returns a pool with cap of the number of logical CPU,
-// and pre-alloced goroutines.
+// NewDefaultPool 返回一个默认配置的池，其worker数量等于CPU逻辑核心数，
+// 并且预分配协程。
 func NewDefaultPool[T any]() *Pool[T] {
 	return NewPool[T](hardware.GetCPUNum(), WithPreAlloc(true))
 }
 
-// Submit a task into the pool,
-// executes it asynchronously.
-// This will block if the pool has finite workers and no idle worker.
-// NOTE: As now golang doesn't support the member method being generic, we use Future[any]
+// Submit 将一个任务提交到池中并异步执行。
+// 如果池的worker数量有限且没有空闲worker，该方法将阻塞。
+// 注意：由于当前Go不支持泛型成员方法，我们使用Future[any]
 func (pool *Pool[T]) Submit(method func() (T, error)) *future.Future[T] {
 	future := future.NewFuture[T]()
 	err := pool.inner.Submit(func() {
-		defer close(future.Ch)
+		defer close(future.Ch) // 确保任务完成后关闭通道
 		defer func() {
 			if x := recover(); x != nil {
 				future.Err = fmt.Errorf("panicked with error: %v", x)
-				panic(x) // throw panic out
+				panic(x) // 将panic重新抛出以获取堆栈跟踪
 			}
 		}()
-		// execute pre handler
+		// 执行预处理器
 		if pool.opt.preHandler != nil {
 			pool.opt.preHandler()
 		}
@@ -92,25 +93,28 @@ func (pool *Pool[T]) Submit(method func() (T, error)) *future.Future[T] {
 	return future
 }
 
-// The number of workers
+// Cap 返回工作者的数量
 func (pool *Pool[T]) Cap() int {
 	return pool.inner.Cap()
 }
 
-// The number of running workers
+// Running 返回当前正在运行的工作者的数量
 func (pool *Pool[T]) Running() int {
 	return pool.inner.Running()
 }
 
-// Free returns the number of free workers
+// Free 返回空闲工作者的数量
 func (pool *Pool[T]) Free() int {
 	return pool.inner.Free()
 }
 
+// Release 释放池中所有工作者，停止所有的协程。
 func (pool *Pool[T]) Release() {
 	pool.inner.Release()
 }
 
+// Resize 调整池中工作者的数量。
+// 如果预分配工作者或提供的尺寸无效，会返回错误。
 func (pool *Pool[T]) Resize(size int) error {
 	if pool.opt.preAlloc {
 		return fmt.Errorf("cannot resize pre-alloc pool")
@@ -122,7 +126,7 @@ func (pool *Pool[T]) Resize(size int) error {
 	return nil
 }
 
-// WarmupPool do warm up logic for each goroutine in pool
+// WarmupPool 对池中的每个协程执行预热逻辑
 func WarmupPool[T any](pool *Pool[T], warmup func()) {
 	cap := pool.Cap()
 	ch := make(chan struct{})
@@ -130,10 +134,10 @@ func WarmupPool[T any](pool *Pool[T], warmup func()) {
 	wg.Add(cap)
 	for i := 0; i < cap; i++ {
 		pool.Submit(func() (T, error) {
-			warmup()
+			warmup() // 执行预热函数
 			wg.Done()
-			<-ch
-			return generic.Zero[T](), nil
+			<-ch                          // 等待，直到所有预热完成
+			return generic.Zero[T](), nil // 返回T类型的零值
 		})
 	}
 	wg.Wait()
