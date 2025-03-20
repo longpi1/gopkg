@@ -1,22 +1,22 @@
-package utils
+package limit
 
 import (
 	"sync"
 	"time"
 )
 
-// FixedWindowCounter 结构体实现固定窗口计数器限流算法。
+// FixedWindowCounter 固定窗口计数器限流算法。
 // mu 用于同步访问，保证并发安全。
 // count 记录当前时间窗口内的请求数量。
 // limit 是时间窗口内允许的最大请求数量。
 // window 记录当前时间窗口的开始时间。
 // duration 是时间窗口的持续时间。
 type FixedWindowCounter struct {
-	mu       sync.Mutex
-	count    int
 	limit    int
-	window   time.Time
+	count    int
 	duration time.Duration
+	window   time.Time
+	mu       sync.Mutex
 }
 
 // NewFixedWindowCounter 构造函数初始化 FixedWindowCounter 实例。
@@ -24,9 +24,9 @@ type FixedWindowCounter struct {
 // duration 参数定义了时间窗口的大小。
 func NewFixedWindowCounter(limit int, duration time.Duration) *FixedWindowCounter {
 	return &FixedWindowCounter{
+		window:   time.Now(),
 		limit:    limit,
-		window:   time.Now(), // 设置当前时间作为窗口的开始时间。
-		duration: duration,   // 设置时间窗口的持续时间。
+		duration: duration,
 	}
 }
 
