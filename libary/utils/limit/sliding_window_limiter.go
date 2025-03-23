@@ -43,7 +43,7 @@ func (s *SlidingWindowLimiter) Allow() bool {
 	// (当前时间纳秒 - 窗口开始时间纳秒) / 每个计数器的时间间隔(纳秒)  % 计数器数量
 	index := int((now.UnixNano()-s.windowStart.UnixNano())/s.interval.Nanoseconds()) % len(s.counters)
 
-	// 检查当前计数器是否已达到限制. 这是错误的逻辑
+	// 检查当前计数器是否已达到限制
 	if s.counters[index] < s.limit {
 		s.counters[index]++
 		return true
